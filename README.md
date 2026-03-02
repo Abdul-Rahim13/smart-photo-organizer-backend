@@ -67,6 +67,6 @@ The backend follows a MVC (Model-View-Controller) architecture to maintain a cle
 
 ### 2. Installation
 ```bash
-git clone [https://github.com/YourRepo/Smart-AI-Photo-Organizer-API.git](https://github.com/YourRepo/Smart-AI-Photo-Organizer-API.git)
+git clone [https://github.com/Abdul-Rahim13/smart-photo-organizer-backend.git]
 cd Smart-AI-Photo-Organizer-API
 npm install
