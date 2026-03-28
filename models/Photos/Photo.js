@@ -54,4 +54,7 @@ const PhotoSchema = new mongoose.Schema({
 // Create an Index for fast searching by AI tags
 PhotoSchema.index({ user: 1, sceneCategory: 1, qualityScore: -1 });
 
+// Create an Index for Gallery sorting
+PhotoSchema.index({ user: 1, createdAt: -1 });
+
 module.exports = mongoose.model('Photo', PhotoSchema);

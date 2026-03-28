@@ -21,8 +21,9 @@ app.use(cors({
 
 // Auth Routes
 app.use('/api/auth', authRoute)
+
 // Photo Upload Routes
-app.use('/api', photoRoute)
+app.use('/api/photos', photoRoute)
 
 
 app.listen(PORT, () => {
