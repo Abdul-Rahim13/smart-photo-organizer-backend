@@ -1,3 +1,5 @@
+const fs = require('fs')
+const path = require('path')
 const photoModel = require('../../models/Photos/Photo')
 
 exports.uploadPhoto = async (req, res) => {
@@ -182,6 +184,37 @@ exports.searchPhotos = async (req, res) => {
         res.status(500).json({ 
             success: false, 
             message: error.message 
+        })
+    }
+}
+
+exports.deletePhoto = async (req, res) => {
+    try {
+        const photo = await photoModel.findOne({_id: req.params.id, user: req.user.id})
+
+        if(!photo) {
+            return res.status(404).json({
+                success: false,
+                message: "Photo not found"
+            })
+        }
+
+        const filePath = path.join(__dirname, '../../uploads', photo.imageUrl.split('/uploads')[1])
+
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+        }
+
+        await photoModel.findByIdAndDelete(req.params.id)
+
+        res.status(200).json({
+            success: true,
+            message: "Photo deleted successfully"
+        })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
         })
     }
 }
