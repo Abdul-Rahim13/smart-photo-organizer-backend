@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const upload = require('../../middleware/uploadMiddleware')
 const { authMiddleware } = require('../../middleware/AuthMiddleware')
-const { uploadPhoto, getAllPhotos, filterPhotos, getByScene, getTopPhotos, getPhotosWithFaces, getFlaggedPhotos, searchPhotos } = require('../../controller/photoController/photo')
+const { uploadPhoto, getAllPhotos, filterPhotos, getByScene, getTopPhotos, getPhotosWithFaces, getFlaggedPhotos, searchPhotos, deletePhoto } = require('../../controller/photoController/photo')
 
 
 
@@ -21,6 +21,8 @@ router.get('/faces', authMiddleware, getPhotosWithFaces)
 router.get('/flagged', authMiddleware, getFlaggedPhotos)
 
 router.get('/search', authMiddleware, searchPhotos)
+
+router.delete('/:id', authMiddleware, deletePhoto)
 
 
 module.exports = router
