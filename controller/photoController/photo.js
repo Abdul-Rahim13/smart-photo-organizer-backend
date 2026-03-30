@@ -190,7 +190,7 @@ exports.searchPhotos = async (req, res) => {
 
 exports.deletePhoto = async (req, res) => {
     try {
-        const photo = await photoModel.find({_id: req.params.id, user: req.user.id})
+        const photo = await photoModel.findOne({_id: req.params.id, user: req.user.id})
 
         if(!photo) {
             return res.status(404).json({
