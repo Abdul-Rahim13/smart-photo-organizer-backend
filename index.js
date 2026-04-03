@@ -7,6 +7,7 @@ const PORT = process.env.PORT || 3000
 const connectDB = require('./config/db')
 const authRoute = require('./routes/authRoute/auth')
 const photoRoute = require('./routes/photoRoute/photo')
+const albumRoute = require('./routes/albumRoute/album')
 
 
 connectDB()
@@ -22,8 +23,11 @@ app.use(cors({
 // Auth Routes
 app.use('/api/auth', authRoute)
 
-// Photo Upload Routes
+// Photo Routes
 app.use('/api/photos', photoRoute)
+
+// Album Routes
+app.use('/api/album', albumRoute)
 
 
 app.listen(PORT, () => {
