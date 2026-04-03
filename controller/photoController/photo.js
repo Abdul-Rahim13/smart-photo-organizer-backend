@@ -218,3 +218,41 @@ exports.deletePhoto = async (req, res) => {
         })
     }
 }
+
+exports.updatePhotoMetadata = async (req, res) => {
+    try {
+        const {sceneCategory, faceCount, qualityScore, tags} = req.body
+
+        const photo = await photoModel.findOne({
+            _id: req.params.id,
+            user: req.user.id
+        })
+
+        if(!photo) {
+            return res.status(404).json({
+                success: false,
+                message: "Photo not found"
+            })
+        }
+
+        if (sceneCategory) photo.sceneCategory = sceneCategory
+        if (faceCount !== undefined) photo.faceCount = Number(faceCount)
+        if (qualityScore !== undefined) photo.qualityScore = Number(qualityScore)
+        if (tags) photo.tags = tags
+
+        photo.isFlagged = photo.qualityScore < 30
+
+        await photo.save()
+
+        res.status(200).json({
+            success: true,
+            message: "Metadata updated successfully",
+            data: photo
+        })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        })
+    }
+}
