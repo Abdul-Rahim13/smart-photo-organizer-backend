@@ -24,25 +24,77 @@ exports.createAlbum = async (req, res) => {
 
 exports.getUserAlbums = async (req, res) => {
     try {
-        
+        const albums = await albumModel.find({user: req.user.id}).populate('coverPhoto', 'imageUrl').sort({createdAt: -1})
+
+        res.json({
+            success: true,
+            data: albums
+        })
+
     } catch (error) {
-        
+        res.status(500).json({
+            success: false,
+            message: error.message
+        })
     }
 } 
 
 exports.getSingleAlbum = async (req, res) => {
     try {
-        
+        const album = await albumModel.findOne({ _id: req.params.id, user: req.user.id}).populate('photos coverPhoto' )
+
+        if (!album) {
+            return res.status(404).json({
+                success: false,
+                message: "Album not found"
+            })
+        }
+
+        res.json({
+            success: true,
+            data: album
+        })
+
     } catch (error) {
-        
+        res.status(500).json({
+            success: false,
+            message: error.message
+        })
     }
 } 
 
 exports.addPhotosToAlbum = async (req, res) => {
     try {
-        
+        const {photoIds} = req.body
+
+        const album = await albumModel.findOne({_id: req.params.id, user: req.user.id})
+
+        if(!album){
+            return res.status(404).json({
+                success: false,
+                message: "Album not found"
+            })
+        }
+
+        // Add new photos (avoid duplicates)
+        album.photos = [...new Set([...album.photos, ...photoIds])]
+
+        if(!album.coverPhoto && photoIds.length > 0) {
+            album.coverPhoto = photoIds[0]
+        }
+
+        await album.save()
+
+        res.json({
+            success: true,
+            message: "Photos added to album",
+            data: album
+        })
     } catch (error) {
-        
+        res.status(500).json({
+            success: false,
+            message: error.message
+        })
     }
 }
 
