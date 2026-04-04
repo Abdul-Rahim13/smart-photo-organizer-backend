@@ -100,24 +100,93 @@ exports.addPhotosToAlbum = async (req, res) => {
 
 exports.removePhotosFromAlbum = async (req, res) => {
     try {
-        
+        const { photoIds } = req.body
+
+        const album = await albumModel.findOne({
+            _id: req.params.id,
+            user: req.user.id
+        })
+
+        if (!album) {
+            return res.status(404).json({
+                success: false,
+                message: "Album not found"
+            })
+        }
+
+        album.photos = album.photos.filter(
+            photo => !photoIds.includes(photo.toString())
+        )
+
+        await album.save()
+
+        res.json({
+            success: true,
+            message: "Photos removed from album",
+            data: album
+        })
+
     } catch (error) {
-        
+        res.status(500).json({
+            success: false,
+            message: error.message
+        })
     }
 }
 
 exports.updateAlbum = async (req, res) => {
     try {
-        
+        const { title, description } = req.body
+
+        const album = await albumModel.findOneAndUpdate(
+            { _id: req.params.id, user: req.user.id },
+            { title, description },
+            { new: true }
+        )
+
+        if (!album) {
+            return res.status(404).json({
+                success: false,
+                message: "Album not found"
+            })
+        }
+
+        res.json({
+            success: true,
+            data: album
+        })
+
     } catch (error) {
-        
+        res.status(500).json({
+            success: false,
+            message: error.message
+        })
     }
 }
 
 exports.deleteAlbum = async (req, res) => {
     try {
-        
+        const album = await albumModel.findOneAndDelete({
+            _id: req.params.id,
+            user: req.user.id
+        })
+
+        if (!album) {
+            return res.status(404).json({
+                success: false,
+                message: "Album not found"
+            })
+        }
+
+        res.json({
+            success: true,
+            message: "Album deleted successfully"
+        })
+
     } catch (error) {
-        
+        res.status(500).json({
+            success: false,
+            message: error.message
+        })
     }
 }
