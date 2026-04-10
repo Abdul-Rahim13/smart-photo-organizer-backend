@@ -33,3 +33,8 @@ app.use('/api/album', albumRoute)
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+// Only for testing backend deployment
+app.get("/", (req, res) => {
+  res.send("FYP Backend is running successfully!");
+});
