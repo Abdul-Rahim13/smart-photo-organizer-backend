@@ -33,10 +33,6 @@ const UserSchema = new mongoose.Schema({
   resetOtpExpire: {
     type: Date,
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
 }, {
   timestamps: true 
 });
