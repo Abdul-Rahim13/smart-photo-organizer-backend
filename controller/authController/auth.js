@@ -1,6 +1,7 @@
 const userModel = require('../../models/User/User')
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const sendMail = require('../../utils/sendMail');
 
 exports.register = async (req, res) => {
     try {
@@ -91,6 +92,47 @@ exports.login = async (req, res) => {
         return res.status(500).json({ 
             success: false, 
             message: "Login failed", error: error.message 
+        });
+    }
+}
+
+exports.forgotPassword = async (req, res) => {
+    try {
+        const {email} = req.body;
+
+        if(!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required",
+            });
+        }
+
+        const user = await userModel.findOne({email});
+
+        if(!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        //saves OTP to DB
+        user.resetOtp = otp;
+
+        //expires in 10 min
+        user.resetOtpExpire = Date.now() + 10 * 60 * 1000;
+
+        await user.save();
+
+        await sendMail(email, "Password Reset ITP: ", `Your OTP is ${otp}`);
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Failed to send OTP",
+            error: error.message,
         });
     }
 }
