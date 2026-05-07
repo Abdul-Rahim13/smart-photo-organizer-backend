@@ -126,7 +126,12 @@ exports.forgotPassword = async (req, res) => {
 
         await user.save();
 
-        await sendMail(email, "Password Reset ITP: ", `Your OTP is ${otp}`);
+        await sendMail(email, "Password Reset OTP: ", `Your OTP is ${otp}`);
+
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent successfully",
+        });
 
     } catch (error) {
         return res.status(500).json({
@@ -156,14 +161,7 @@ exports.verifyOtp = async (req, res) => {
                 message: "User not found",
             });
         }
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: "User not found",
-            });
-        }
-
+        
         if (user.resetOtp !== otp) {
             return res.status(400).json({
                 success: false,
