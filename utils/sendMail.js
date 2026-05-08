@@ -3,23 +3,22 @@ const nodemailer = require("nodemailer");
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
+        type: "OAuth2",
         user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    }
+        clientId: process.env.GMAIL_CLIENT_ID,
+        clientSecret: process.env.GMAIL_CLIENT_SECRET,
+        refreshToken: process.env.GMAIL_REFRESH_TOKEN,
+    },
 });
 
-// DEBUG
-transporter.verify(function (error, success) {
-    if (error) {
-        console.log("MAIL ERROR:", error);
-    } else {
-        console.log("MAIL SERVER READY");
-    }
+transporter.verify((error) => {
+    if (error) console.log("MAIL ERROR:", error);
+    else console.log("MAIL SERVER READY");
 });
 
 const sendMail = async (to, subject, text) => {
     await transporter.sendMail({
-        from: process.env.EMAIL_USER,
+        from: `"SmartEditor AI" <${process.env.EMAIL_USER}>`,
         to,
         subject,
         text,
