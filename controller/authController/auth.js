@@ -97,19 +97,27 @@ exports.login = async (req, res) => {
 }
 
 exports.forgotPassword = async (req, res) => {
-    try {
-        const {email} = req.body;
 
-        if(!email) {
+    try {
+
+        console.log("FORGOT PASSWORD API HIT");
+
+        const { email } = req.body;
+
+        console.log("EMAIL:", email);
+
+        if (!email) {
             return res.status(400).json({
                 success: false,
                 message: "Email is required",
             });
         }
 
-        const user = await userModel.findOne({email});
+        const user = await userModel.findOne({ email });
 
-        if(!user) {
+        console.log("USER:", user);
+
+        if (!user) {
             return res.status(404).json({
                 success: false,
                 message: "User not found",
@@ -118,15 +126,22 @@ exports.forgotPassword = async (req, res) => {
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-        //saves OTP to DB
-        user.resetOtp = otp;
+        console.log("OTP:", otp);
 
-        //expires in 10 min
+        user.resetOtp = otp;
         user.resetOtpExpire = Date.now() + 10 * 60 * 1000;
 
         await user.save();
 
-        await sendMail(email, "Password Reset OTP: ", `Your OTP is ${otp}`);
+        console.log("OTP SAVED");
+
+        await sendMail(
+            email,
+            "Password Reset OTP",
+            `Your OTP is ${otp}`
+        );
+
+        console.log("MAIL SENT");
 
         return res.status(200).json({
             success: true,
@@ -134,13 +149,17 @@ exports.forgotPassword = async (req, res) => {
         });
 
     } catch (error) {
+
+        console.log("FORGOT PASSWORD ERROR:", error);
+
         return res.status(500).json({
             success: false,
             message: "Failed to send OTP",
             error: error.message,
         });
+
     }
-}
+};
 
 exports.verifyOtp = async (req, res) => {
     try {

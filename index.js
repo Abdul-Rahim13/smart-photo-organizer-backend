@@ -16,7 +16,7 @@ app.use(morgan('dev'))                  // middleware for Express that logs ever
 app.use(express.json())
 app.use(express.urlencoded({extended: true}))
 app.use(cors({
-    origin: 'http://localhost:3000',         // frontend URL
+    origin: true,         // frontend URL
   credentials: true,                        // allow cookies if needed
 }))
 

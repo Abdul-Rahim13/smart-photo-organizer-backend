@@ -8,6 +8,15 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+// DEBUG
+transporter.verify(function (error, success) {
+    if (error) {
+        console.log("MAIL ERROR:", error);
+    } else {
+        console.log("MAIL SERVER READY");
+    }
+});
+
 const sendMail = async (to, subject, text) => {
     await transporter.sendMail({
         from: process.env.EMAIL_USER,
