@@ -1,26 +1,10 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-        type: "OAuth2",
-        user: process.env.EMAIL_USER,
-        clientId: process.env.GMAIL_CLIENT_ID,
-        clientSecret: process.env.GMAIL_CLIENT_SECRET,
-        refreshToken: process.env.GMAIL_REFRESH_TOKEN,
-    },
-});
-
-transporter.verify((error) => {
-    if (error) console.log("MAIL ERROR:", error);
-    else console.log("MAIL SERVER READY");
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sendMail = async (to, subject, text) => {
-    await transporter.sendMail({
-        from: `"SmartEditor AI" <${process.env.EMAIL_USER}>`,
+    await resend.emails.send({
+        from: "onboarding@resend.dev",
         to,
         subject,
         text,
