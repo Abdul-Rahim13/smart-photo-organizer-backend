@@ -33,6 +33,12 @@ const UserSchema = new mongoose.Schema({
   resetOtpExpire: {
     type: Date,
   },
+  googleId: { 
+    type: String 
+  },
+  profilePicture: { 
+    type: String 
+  },
 }, {
   timestamps: true 
 });

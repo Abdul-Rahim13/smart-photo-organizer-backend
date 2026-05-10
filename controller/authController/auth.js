@@ -2,6 +2,10 @@ const userModel = require('../../models/User/User')
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const sendMail = require('../../utils/sendMail');
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+
 
 exports.register = async (req, res) => {
     try {
@@ -270,3 +274,63 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
+exports.googleLogin = async (req, res) => {
+    try {
+        const { token } = req.body;
+
+        if (!token) return res.status(400).json({
+            success: false,
+            message: "Token required"
+        });
+
+        // Verify Google token
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+
+        const { name, email, picture, sub: googleId } = ticket.getPayload();
+
+        // Find or create user
+        let user = await userModel.findOne({ email });
+
+        if (!user) {
+            user = await userModel.create({
+                name,
+                email,
+                googleId,
+                profilePicture: picture,
+                role: 'user',
+                password: await require('bcryptjs').hash(googleId + Date.now(), 10),
+            });
+        }
+
+        // Generate JWT
+        const jwtToken = require('jsonwebtoken').sign({
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+        }, process.env.JWT_SECRET, { expiresIn: '1d' });
+
+        return res.status(200).json({
+            success: true,
+            message: "Google login successful",
+            token: jwtToken,
+            data: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                profilePicture: user.profilePicture,
+            }
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: "Google login failed",
+            error: error.message
+        });
+    }
+};
