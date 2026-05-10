@@ -274,10 +274,13 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
-exports.googleLogin = async (req, res) => {
+exports.googleLogin = async (req, res) => { 
     try {
         const { token } = req.body;
 
+        console.log("GOOGLE LOGIN HIT");
+        console.log("TOKEN RECEIVED:", token ? "YES" : "NO");
+        console.log("GOOGLE CLIENT ID:", process.env.GOOGLE_CLIENT_ID ? "EXISTS" : "MISSING");
         if (!token) return res.status(400).json({
             success: false,
             message: "Token required"
@@ -327,6 +330,7 @@ exports.googleLogin = async (req, res) => {
         });
 
     } catch (error) {
+        console.log("GOOGLE LOGIN ERROR:", error.message); 
         return res.status(500).json({
             success: false,
             message: "Google login failed",
