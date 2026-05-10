@@ -274,25 +274,22 @@ exports.resetPassword = async (req, res) => {
     }
 };
 
-exports.googleLogin = async (req, res) => { 
+exports.googleLogin = async (req, res) => {
     try {
         const { token } = req.body;
 
-        console.log("GOOGLE LOGIN HIT");
-        console.log("TOKEN RECEIVED:", token ? "YES" : "NO");
-        console.log("GOOGLE CLIENT ID:", process.env.GOOGLE_CLIENT_ID ? "EXISTS" : "MISSING");
         if (!token) return res.status(400).json({
             success: false,
             message: "Token required"
         });
 
-        // Verify Google token
-        const ticket = await client.verifyIdToken({
-            idToken: token,
-            audience: process.env.GOOGLE_CLIENT_ID,
-        });
+        // ✅ Use access token to get user info from Google
+        const googleRes = await require('axios').get(
+            'https://www.googleapis.com/oauth2/v3/userinfo',
+            { headers: { Authorization: `Bearer ${token}` } }
+        );
 
-        const { name, email, picture, sub: googleId } = ticket.getPayload();
+        const { name, email, picture, sub: googleId } = googleRes.data;
 
         // Find or create user
         let user = await userModel.findOne({ email });
@@ -330,7 +327,7 @@ exports.googleLogin = async (req, res) => {
         });
 
     } catch (error) {
-        console.log("GOOGLE LOGIN ERROR:", error.message); 
+        console.log("GOOGLE LOGIN ERROR:", error.message);
         return res.status(500).json({
             success: false,
             message: "Google login failed",
