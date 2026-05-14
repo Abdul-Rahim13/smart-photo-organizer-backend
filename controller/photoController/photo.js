@@ -5,8 +5,6 @@ const photoModel = require('../../models/Photos/Photo')
 exports.uploadPhoto = async (req, res) => {
     try {
         const files = req.files
-        // Dummy -> reomve after Frontend AI model Training
-        const scenes = ['indoor', 'outdoor', 'event']
 
         if (!files || files.length === 0) {
             return res.status(400).json({
@@ -15,20 +13,24 @@ exports.uploadPhoto = async (req, res) => {
             })
         }
 
+        const categoryMap = {
+            'Events':  'event',
+            'Outdoor': 'outdoor',
+            'Indoor':  'indoor',
+        }
+
         const photos = files.map(file => {
-            
             return {
                 imageUrl: `${req.protocol}://${req.get('host')}/uploads/${file.filename}`,
                 format: file.mimetype,
                 size: file.size,
                 user: req.user.id,
-                sceneCategory: req.body.category || 'uncategorized',
+                sceneCategory: categoryMap[req.body.category] || 'unclassified', // ✅ matches your enum
                 faceCount: Math.floor(Math.random() * 5),
                 qualityScore: Math.floor(Math.random() * 100),
                 isFlagged: false,
                 tags: []
             }
-            
         })
 
         const savedPhotos = await photoModel.insertMany(photos)
