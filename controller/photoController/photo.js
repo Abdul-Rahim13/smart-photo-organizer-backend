@@ -16,16 +16,13 @@ exports.uploadPhoto = async (req, res) => {
         }
 
         const photos = files.map(file => {
-             // Dummy -> reomve after Frontend AI model Training
-            const randomScene = scenes[Math.floor(Math.random() * scenes.length)]
             
             return {
                 imageUrl: `${req.protocol}://${req.get('host')}/uploads/${file.filename}`,
                 format: file.mimetype,
                 size: file.size,
                 user: req.user.id,
-                // Dummy -> reomve after Frontend AI model Training
-                sceneCategory: randomScene,
+                sceneCategory: req.body.category || 'uncategorized',
                 faceCount: Math.floor(Math.random() * 5),
                 qualityScore: Math.floor(Math.random() * 100),
                 isFlagged: false,
