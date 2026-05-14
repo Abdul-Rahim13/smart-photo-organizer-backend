@@ -1,6 +1,6 @@
 const fs = require('fs')
 if (!fs.existsSync('uploads')) {
-    fs.mkdirSync('uploads')
+    fs.mkdirSync('upload')
 }
 
 require('dotenv').config()
