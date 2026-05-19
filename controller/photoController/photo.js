@@ -28,7 +28,7 @@ exports.uploadPhoto = async (req, res) => {
                 sceneCategory: categoryMap[req.body.category] || 'unclassified', // ✅ matches your enum
                 faceCount: Math.floor(Math.random() * 5),
                 qualityScore: Math.floor(Math.random() * 100),
-                isFlagged: true,
+                isFlagged: false,
                 tags: []
             }
         })
