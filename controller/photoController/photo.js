@@ -4,51 +4,64 @@ const photoModel = require('../../models/Photos/Photo')
 
 exports.uploadPhoto = async (req, res) => {
     try {
-        const files = req.files
+        const files = req.files;
 
         if (!files || files.length === 0) {
             return res.status(400).json({
                 success: false,
                 message: "No files uploaded"
-            })
+            });
         }
 
+        // Expanded mapping matrix to support standard AI taxonomy outputs
         const categoryMap = {
-            'Events':  'event',
+            'Events': 'event',
+            'Event': 'event',
             'Outdoor': 'outdoor',
-            'Indoor':  'indoor',
-        }
+            'Indoor': 'indoor',
+            'Party': 'party',
+            'Trip': 'trip',
+            'General': 'general'
+        };
 
         const photos = files.map(file => {
+            // Read values sent dynamically from Next.js Frontend AI proxy
+            const rawCategory = req.body.sceneCategory || req.body.category || 'General';
+            const parsedCategory = categoryMap[rawCategory] || rawCategory.toLowerCase();
+            
+            const realFaceCount = req.body.faceCount ? parseInt(req.body.faceCount, 10) : 1;
+            const realQuality = req.body.qualityScore ? parseInt(req.body.qualityScore, 10) : 85;
+
             return {
                 imageUrl: `${req.protocol}://${req.get('host')}/uploads/${file.filename}`,
                 format: file.mimetype,
                 size: file.size,
                 user: req.user.id,
-                sceneCategory: categoryMap[req.body.category] || 'unclassified', // ✅ matches your enum
-                faceCount: Math.floor(Math.random() * 5),
-                qualityScore: Math.floor(Math.random() * 100),
-                isFlagged: false,
-                tags: []
-            }
-        })
+                sceneCategory: parsedCategory, // Native AI value assignment
+                faceCount: realFaceCount,       // Native AI value assignment
+                qualityScore: realQuality,     // Native AI value assignment
+                isFlagged: realQuality < 30,
+                tags: req.body.tags ? JSON.parse(req.body.tags) : []
+            };
+        });
 
-        const savedPhotos = await photoModel.insertMany(photos)
+        const savedPhotos = await photoModel.insertMany(photos);
 
         res.status(201).json({
             success: true,
-            message: "Images uploaded successfully",
+            message: "Images uploaded and classified successfully via AI",
             data: savedPhotos
-        })
+        });
 
     } catch (error) {
+        console.error("Backend Error:", error.message);
         res.status(500).json({
             success: false,
-            message: "Upload failed",
+            message: "Upload transaction dropped at database cluster layer",
             error: error.message
-        })
+        });
     }
-}
+};
 
 exports.getAllPhotos = async (req, res) => {
     try {
