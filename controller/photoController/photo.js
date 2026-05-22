@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 // FIXED: Correct path to models (going up 2 levels from controller/photoController/)
-const photoModel = require('../../models/Photos');
+const photoModel = require('../../models/Photos/Photo');
 
 exports.uploadPhoto = async (req, res) => {
     try {
