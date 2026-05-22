@@ -1,30 +1,61 @@
-const express = require('express')
-const router = express.Router()
-const upload = require('../../middleware/uploadMiddleware')
-const { authMiddleware } = require('../../middleware/AuthMiddleware')
-const { uploadPhoto, getAllPhotos, filterPhotos, getByScene, getTopPhotos, getPhotosWithFaces, getFlaggedPhotos, searchPhotos, deletePhoto, updatePhotoMetadata } = require('../../controller/photoController/photo')
+// routes/photoRoute/photo.js
+const express = require('express');
+const router = express.Router();
+const { protect } = require('../../middleware/authMiddleware');
+const {
+    uploadPhotos,
+    getAllPhotos,
+    getPhotoById,
+    updatePhoto,
+    deletePhoto,
+    getPhotosByScene,
+    getPhotosByFaceCount,
+    getFlaggedPhotos,
+    searchPhotos,
+    getTopRatedPhotos,
+    getPhotosWithFaces,
+    filterPhotos,
+    toggleStar,
+    moveToTrash,
+    restoreFromTrash,
+    getTrashedPhotos,
+    permanentlyDeletePhotos,
+    autoDeleteExpiredTrash
+} = require('../../controllers/photoController');
+const upload = require('../../config/multer');
 
+// Protect all routes
+router.use(protect);
 
+// Upload route
+router.post('/upload', upload.array('photos', 50), uploadPhotos);
 
-router.post('/upload', authMiddleware, upload.array('images', 5), uploadPhoto )
+// Trash routes (add these BEFORE the :id route)
+router.put('/trash', moveToTrash);
+router.put('/restore', restoreFromTrash);
+router.get('/trash', getTrashedPhotos);
+router.delete('/permanent', permanentlyDeletePhotos);
+router.delete('/auto-delete-expired', autoDeleteExpiredTrash);
 
-router.get('/', authMiddleware, getAllPhotos)
+// Filter and search routes
+router.get('/filter', filterPhotos);
+router.get('/search', searchPhotos);
+router.get('/top', getTopRatedPhotos);
+router.get('/faces', getPhotosWithFaces);
+router.get('/flagged', getFlaggedPhotos);
+router.get('/scene/:scene', getPhotosByScene);
+router.get('/face-count/:minFaces', getPhotosByFaceCount);
 
-router.get('/filter', authMiddleware, filterPhotos)
+// Star/Favorite route
+router.patch('/:id/star', toggleStar);
 
-router.get('/scene/:type', authMiddleware, getByScene)
+// CRUD routes (keep these at the end)
+router.route('/')
+    .get(getAllPhotos);
 
-router.get('/top', authMiddleware, getTopPhotos)
+router.route('/:id')
+    .get(getPhotoById)
+    .put(updatePhoto)
+    .delete(deletePhoto);
 
-router.get('/faces', authMiddleware, getPhotosWithFaces)
-
-router.get('/flagged', authMiddleware, getFlaggedPhotos)
-
-router.get('/search', authMiddleware, searchPhotos)
-
-router.delete('/:id', authMiddleware, deletePhoto)
-
-router.put('/:id/metadata', authMiddleware, updatePhotoMetadata)
-
-
-module.exports = router
+module.exports = router;

@@ -209,3 +209,184 @@ exports.updatePhotoMetadata = async (req, res) => {
         return res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// controllers/photoController.js - Add these functions
+
+// Move photos to trash
+exports.moveToTrash = async (req, res) => {
+    try {
+        const { photoIds } = req.body;
+        
+        if (!photoIds || !Array.isArray(photoIds)) {
+            return res.status(400).json({
+                success: false,
+                message: "photoIds array is required"
+            });
+        }
+
+        const result = await Photo.updateMany(
+            { 
+                _id: { $in: photoIds },
+                user: req.user.id 
+            },
+            { 
+                isTrashed: true,
+                trashedAt: new Date()
+            }
+        );
+
+        // Get the updated photos to return
+        const photos = await Photo.find({
+            _id: { $in: photoIds },
+            user: req.user.id
+        });
+
+        res.json({
+            success: true,
+            message: `${result.modifiedCount} photos moved to trash`,
+            data: photos
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// Restore photos from trash
+exports.restoreFromTrash = async (req, res) => {
+    try {
+        const { photoIds } = req.body;
+        
+        if (!photoIds || !Array.isArray(photoIds)) {
+            return res.status(400).json({
+                success: false,
+                message: "photoIds array is required"
+            });
+        }
+
+        const result = await Photo.updateMany(
+            { 
+                _id: { $in: photoIds },
+                user: req.user.id,
+                isTrashed: true
+            },
+            { 
+                isTrashed: false,
+                trashedAt: null
+            }
+        );
+
+        const photos = await Photo.find({
+            _id: { $in: photoIds },
+            user: req.user.id
+        });
+
+        res.json({
+            success: true,
+            message: `${result.modifiedCount} photos restored`,
+            data: photos
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// Get all trashed photos
+exports.getTrashedPhotos = async (req, res) => {
+    try {
+        const photos = await Photo.find({
+            user: req.user.id,
+            isTrashed: true
+        }).sort({ trashedAt: -1 });
+
+        // Calculate days in trash for each photo
+        const photosWithDays = photos.map(photo => {
+            const daysInTrash = photo.trashedAt 
+                ? Math.floor((Date.now() - new Date(photo.trashedAt)) / (1000 * 60 * 60 * 24))
+                : 0;
+            const photoObj = photo.toObject();
+            photoObj.daysInTrash = daysInTrash;
+            photoObj.id = photoObj._id;
+            return photoObj;
+        });
+
+        res.json({
+            success: true,
+            data: photosWithDays
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// Permanently delete photos
+exports.permanentlyDeletePhotos = async (req, res) => {
+    try {
+        const { photoIds } = req.body;
+        
+        if (!photoIds || !Array.isArray(photoIds)) {
+            return res.status(400).json({
+                success: false,
+                message: "photoIds array is required"
+            });
+        }
+
+        // First get the photos to delete their files
+        const photos = await Photo.find({
+            _id: { $in: photoIds },
+            user: req.user.id,
+            isTrashed: true
+        });
+
+        // Delete from database
+        const result = await Photo.deleteMany({
+            _id: { $in: photoIds },
+            user: req.user.id,
+            isTrashed: true
+        });
+
+        res.json({
+            success: true,
+            message: `${result.deletedCount} photos permanently deleted`,
+            deletedIds: photoIds
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+// Auto-delete photos that have been in trash for more than 30 days
+exports.autoDeleteExpiredTrash = async (req, res) => {
+    try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const result = await Photo.deleteMany({
+            user: req.user.id,
+            isTrashed: true,
+            trashedAt: { $lt: thirtyDaysAgo }
+        });
+
+        res.json({
+            success: true,
+            message: `${result.deletedCount} expired photos auto-deleted`,
+            deletedCount: result.deletedCount
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};

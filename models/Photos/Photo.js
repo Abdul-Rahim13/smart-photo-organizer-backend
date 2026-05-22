@@ -1,3 +1,4 @@
+// models/photoModel.js
 const mongoose = require('mongoose');
 
 const PhotoSchema = new mongoose.Schema({
@@ -17,17 +18,17 @@ const PhotoSchema = new mongoose.Schema({
   // ── EXACT DIRECTORY COGNITIVE TAXONOMY MATCHES ──
   sceneCategory: {
     type: String,
-    enum: ['Party', 'Event', 'Trip', 'General'], // Capitalized & aligned with primary folders
+    enum: ['Party', 'Event', 'Trip', 'General'],
     default: 'General'
   },
   environment: {
     type: String,
-    enum: ['Indoor', 'Outdoor'],                 // Captures Spatial Zone folder layout
+    enum: ['Indoor', 'Outdoor'],
     default: 'Indoor'
   },
   socialGroup: {
     type: String,
-    enum: ['Solo', 'Couple', 'Group', 'Empty'],  // Captures Social Density folder layout
+    enum: ['Solo', 'Couple', 'Group', 'Empty'],
     default: 'Solo'
   },
   faceCount: {
@@ -47,11 +48,32 @@ const PhotoSchema = new mongoose.Schema({
     default: []
   },
   format: String,
-  size: Number
+  size: Number,
+  
+  // ── TRASH FIELDS (ADD THESE) ──
+  isTrashed: {
+    type: Boolean,
+    default: false
+  },
+  trashedAt: {
+    type: Date,
+    default: null
+  },
+  isDuplicate: {
+    type: Boolean,
+    default: false
+  },
+  duplicateOf: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Photo',
+    default: null
+  }
 }, {
   timestamps: true
 });
 
+// Add index for trash queries
+PhotoSchema.index({ user: 1, isTrashed: 1, trashedAt: 1 });
 PhotoSchema.index({ user: 1, sceneCategory: 1, environment: 1, socialGroup: 1 });
 PhotoSchema.index({ user: 1, createdAt: -1 });
 
