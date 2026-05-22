@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../../middleware/AuthMiddleware');
-const upload = require('../../config/multer');
+const upload = require('../../middleware/uploadMiddleware');
 
 // Import from controller - note the path goes to the folder, then the file
 const {
