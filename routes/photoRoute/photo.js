@@ -1,7 +1,7 @@
 // routes/photoRoute/photo.js
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../../middleware/AuthMiddleware');
+const { authMiddleware } = require('../../middleware/AuthMiddleware');
 const {
     uploadPhotos,
     getAllPhotos,
@@ -25,7 +25,7 @@ const {
 const upload = require('../../config/multer');
 
 // Protect all routes
-router.use(protect);
+router.use(authMiddleware);
 
 // Upload route
 router.post('/upload', upload.array('photos', 50), uploadPhotos);
