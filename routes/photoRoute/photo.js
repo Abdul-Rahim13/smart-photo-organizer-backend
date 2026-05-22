@@ -21,7 +21,7 @@ const {
     getTrashedPhotos,
     permanentlyDeletePhotos,
     autoDeleteExpiredTrash
-} = require('../../controllers/photoController');
+} = require('../../controller/photoController/photo');
 const upload = require('../../config/multer');
 
 // Protect all routes
