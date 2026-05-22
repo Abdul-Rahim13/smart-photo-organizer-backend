@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+// FIXED: Correct path to models (going up 2 levels from controller/photoController/)
 const photoModel = require('../../models/Photos');
 
 exports.uploadPhoto = async (req, res) => {
     try {
-        // 1. Safe extraction array for handling both array and single file uploads
         let uploadedFiles = [];
         if (req.files && Array.isArray(req.files)) {
             uploadedFiles = req.files;
@@ -13,25 +13,20 @@ exports.uploadPhoto = async (req, res) => {
         }
 
         if (uploadedFiles.length === 0) {
-            console.error("❌ Multer Configuration Breakdown: No files found in request pipeline.");
             return res.status(400).json({
                 success: false,
-                message: "No binary files detected in the request payload structure."
+                message: "No files detected"
             });
         }
 
-        // 2. Validate user identity object mapping properties
         if (!req.user || !req.user.id) {
-            console.error("❌ Authorization Error: req.user.id is empty or missing.");
             return res.status(401).json({
                 success: false,
-                message: "Authentication failed. User missing from request scope."
+                message: "Authentication failed"
             });
         }
 
-        // 3. Map file records securely
         const photos = uploadedFiles.map(file => {
-            // Preserve proper PascalCase names so your frontend taxonomy matches perfectly!
             let targetCategory = "General";
             const receivedCategory = req.body.sceneCategory || req.body.category;
             
@@ -45,7 +40,6 @@ exports.uploadPhoto = async (req, res) => {
             const realFaceCount = req.body.faceCount ? parseInt(req.body.faceCount, 10) : 1;
             const realQuality = req.body.qualityScore ? parseInt(req.body.qualityScore, 10) : 85;
 
-            // Safe parsing wrapper for stringified arrays sent from frontend FormData
             let parsedTags = ['Live_DB_Upload'];
             if (req.body.tags) {
                 try {
@@ -63,8 +57,8 @@ exports.uploadPhoto = async (req, res) => {
                 format: file.mimetype || 'image/jpeg',
                 size: file.size || 0,
                 user: req.user.id,
-                sceneCategory: targetCategory, // Fixed string formatting
-                category: targetCategory,      // Injects both keys for cross-compatibility
+                sceneCategory: targetCategory,
+                category: targetCategory,
                 faceCount: realFaceCount,
                 qualityScore: realQuality,
                 isFlagged: realQuality < 30,
@@ -72,33 +66,84 @@ exports.uploadPhoto = async (req, res) => {
             };
         });
 
-        console.log("💾 Executing insertMany to MongoDB cluster instance:", photos);
-
-        // 4. Atomic Database Insert Statement
         const savedPhotos = await photoModel.insertMany(photos);
 
         return res.status(201).json({
             success: true,
-            message: "Images uploaded and classified successfully via AI",
-            photo: savedPhotos[0], // Return single photo reference structure back to client
+            message: "Images uploaded successfully",
+            photo: savedPhotos[0],
             data: savedPhotos
         });
 
     } catch (error) {
-        console.error("❌ CRITICAL BACKEND CONTROLLER EXCEPTION:", error);
+        console.error("Upload error:", error);
         return res.status(500).json({
             success: false,
-            message: "Upload transaction dropped at processing layer",
-            error: error.message
+            message: error.message
         });
     }
 };
 
-// ── EXTENDED CRITICAL FETCH API ADAPTERS ──────────────────────────────────
 exports.getAllPhotos = async (req, res) => {
     try {
         const photos = await photoModel.find({ user: req.user.id }).sort({ createdAt: -1 });
-        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
+        return res.status(200).json({ success: true, data: photos });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.getPhotoById = async (req, res) => {
+    try {
+        const photo = await photoModel.findOne({
+            _id: req.params.id,
+            user: req.user.id
+        });
+        if (!photo) {
+            return res.status(404).json({ success: false, message: "Photo not found" });
+        }
+        res.json({ success: true, data: photo });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.updatePhoto = async (req, res) => {
+    try {
+        const { sceneCategory, environment, socialGroup, tags, title } = req.body;
+        const photo = await photoModel.findOne({ _id: req.params.id, user: req.user.id });
+        
+        if (!photo) {
+            return res.status(404).json({ success: false, message: "Photo not found" });
+        }
+
+        if (sceneCategory) photo.sceneCategory = sceneCategory;
+        if (environment) photo.environment = environment;
+        if (socialGroup) photo.socialGroup = socialGroup;
+        if (tags) photo.tags = tags;
+        if (title) photo.title = title;
+
+        await photo.save();
+        res.json({ success: true, data: photo });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+exports.deletePhoto = async (req, res) => {
+    try {
+        const photo = await photoModel.findOne({ _id: req.params.id, user: req.user.id });
+        if (!photo) {
+            return res.status(404).json({ success: false, message: "Photo not found" });
+        }
+
+        const filePath = path.join(__dirname, '../../uploads', path.basename(photo.imageUrl));
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        await photoModel.findByIdAndDelete(req.params.id);
+        return res.status(200).json({ success: true, message: "Photo deleted successfully" });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
@@ -115,7 +160,7 @@ exports.filterPhotos = async (req, res) => {
         if (tag) filter.tags = { $in: [tag] };
 
         const photos = await photoModel.find(filter).sort({ createdAt: -1 });
-        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
+        return res.status(200).json({ success: true, data: photos });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
@@ -124,7 +169,7 @@ exports.filterPhotos = async (req, res) => {
 exports.getByScene = async (req, res) => {
     try {
         const photos = await photoModel.find({ user: req.user.id, sceneCategory: req.params.type }).sort({ createdAt: -1 });
-        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
+        return res.status(200).json({ success: true, data: photos });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
@@ -133,7 +178,7 @@ exports.getByScene = async (req, res) => {
 exports.getTopPhotos = async (req, res) => {
     try {
         const photos = await photoModel.find({ user: req.user.id, qualityScore: { $gte: 70 } }).sort({ qualityScore: -1 });
-        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
+        return res.status(200).json({ success: true, data: photos });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
@@ -143,7 +188,7 @@ exports.getPhotosWithFaces = async (req, res) => {
     try {
         const min = req.query.min || 1;
         const photos = await photoModel.find({ user: req.user.id, faceCount: { $gte: Number(min) } });
-        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
+        return res.status(200).json({ success: true, data: photos });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
@@ -152,7 +197,7 @@ exports.getPhotosWithFaces = async (req, res) => {
 exports.getFlaggedPhotos = async (req, res) => {
     try {
         const photos = await photoModel.find({ user: req.user.id, isFlagged: true });
-        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
+        return res.status(200).json({ success: true, data: photos });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
@@ -162,26 +207,7 @@ exports.searchPhotos = async (req, res) => {
     try {
         const { tag } = req.query;
         const photos = await photoModel.find({ user: req.user.id, tags: { $in: [tag] } });
-        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
-    } catch (error) {
-        return res.status(500).json({ success: false, message: error.message });
-    }
-};
-
-exports.deletePhoto = async (req, res) => {
-    try {
-        const photo = await photoModel.findOne({ _id: req.params.id, user: req.user.id });
-        if (!photo) {
-            return res.status(404).json({ success: false, message: "Photo not found" });
-        }
-
-        const filePath = path.join(__dirname, '../../uploads', photo.imageUrl.split('/uploads')[1]);
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
-
-        await photoModel.findByIdAndDelete(req.params.id);
-        return res.status(200).json({ success: true, message: "Photo deleted successfully" });
+        return res.status(200).json({ success: true, data: photos });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
@@ -204,189 +230,109 @@ exports.updatePhotoMetadata = async (req, res) => {
         photo.isFlagged = photo.qualityScore < 30;
         await photo.save();
 
-        return res.status(200).json({ success: true, message: "Metadata updated successfully", data: photo });
+        return res.status(200).json({ success: true, data: photo });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// controllers/photoController.js - Add these functions
+// Aliases for route compatibility
+exports.uploadPhotos = exports.uploadPhoto;
+exports.getPhotosByScene = exports.getByScene;
+exports.getPhotosByFaceCount = exports.getPhotosWithFaces;
+exports.getTopRatedPhotos = exports.getTopPhotos;
 
-// Move photos to trash
+// Toggle star/favorite
+exports.toggleStar = async (req, res) => {
+    try {
+        const photo = await photoModel.findOne({ _id: req.params.id, user: req.user.id });
+        if (!photo) {
+            return res.status(404).json({ success: false, message: "Photo not found" });
+        }
+        photo.isStarred = !photo.isStarred;
+        await photo.save();
+        res.json({ success: true, data: photo });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// Trash functions
 exports.moveToTrash = async (req, res) => {
     try {
         const { photoIds } = req.body;
-        
         if (!photoIds || !Array.isArray(photoIds)) {
-            return res.status(400).json({
-                success: false,
-                message: "photoIds array is required"
-            });
+            return res.status(400).json({ success: false, message: "photoIds array is required" });
         }
 
-        const result = await Photo.updateMany(
-            { 
-                _id: { $in: photoIds },
-                user: req.user.id 
-            },
-            { 
-                isTrashed: true,
-                trashedAt: new Date()
-            }
+        const result = await photoModel.updateMany(
+            { _id: { $in: photoIds }, user: req.user.id },
+            { isTrashed: true, trashedAt: new Date() }
         );
 
-        // Get the updated photos to return
-        const photos = await Photo.find({
-            _id: { $in: photoIds },
-            user: req.user.id
-        });
-
-        res.json({
-            success: true,
-            message: `${result.modifiedCount} photos moved to trash`,
-            data: photos
-        });
+        const photos = await photoModel.find({ _id: { $in: photoIds }, user: req.user.id });
+        res.json({ success: true, message: `${result.modifiedCount} photos moved to trash`, data: photos });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Restore photos from trash
 exports.restoreFromTrash = async (req, res) => {
     try {
         const { photoIds } = req.body;
-        
         if (!photoIds || !Array.isArray(photoIds)) {
-            return res.status(400).json({
-                success: false,
-                message: "photoIds array is required"
-            });
+            return res.status(400).json({ success: false, message: "photoIds array is required" });
         }
 
-        const result = await Photo.updateMany(
-            { 
-                _id: { $in: photoIds },
-                user: req.user.id,
-                isTrashed: true
-            },
-            { 
-                isTrashed: false,
-                trashedAt: null
-            }
+        const result = await photoModel.updateMany(
+            { _id: { $in: photoIds }, user: req.user.id, isTrashed: true },
+            { isTrashed: false, trashedAt: null }
         );
 
-        const photos = await Photo.find({
-            _id: { $in: photoIds },
-            user: req.user.id
-        });
-
-        res.json({
-            success: true,
-            message: `${result.modifiedCount} photos restored`,
-            data: photos
-        });
+        const photos = await photoModel.find({ _id: { $in: photoIds }, user: req.user.id });
+        res.json({ success: true, message: `${result.modifiedCount} photos restored`, data: photos });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Get all trashed photos
 exports.getTrashedPhotos = async (req, res) => {
     try {
-        const photos = await Photo.find({
-            user: req.user.id,
-            isTrashed: true
-        }).sort({ trashedAt: -1 });
-
-        // Calculate days in trash for each photo
+        const photos = await photoModel.find({ user: req.user.id, isTrashed: true }).sort({ trashedAt: -1 });
         const photosWithDays = photos.map(photo => {
-            const daysInTrash = photo.trashedAt 
-                ? Math.floor((Date.now() - new Date(photo.trashedAt)) / (1000 * 60 * 60 * 24))
-                : 0;
+            const daysInTrash = photo.trashedAt ? Math.floor((Date.now() - new Date(photo.trashedAt)) / (1000 * 60 * 60 * 24)) : 0;
             const photoObj = photo.toObject();
             photoObj.daysInTrash = daysInTrash;
             photoObj.id = photoObj._id;
             return photoObj;
         });
-
-        res.json({
-            success: true,
-            data: photosWithDays
-        });
+        res.json({ success: true, data: photosWithDays });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Permanently delete photos
 exports.permanentlyDeletePhotos = async (req, res) => {
     try {
         const { photoIds } = req.body;
-        
         if (!photoIds || !Array.isArray(photoIds)) {
-            return res.status(400).json({
-                success: false,
-                message: "photoIds array is required"
-            });
+            return res.status(400).json({ success: false, message: "photoIds array is required" });
         }
 
-        // First get the photos to delete their files
-        const photos = await Photo.find({
-            _id: { $in: photoIds },
-            user: req.user.id,
-            isTrashed: true
-        });
-
-        // Delete from database
-        const result = await Photo.deleteMany({
-            _id: { $in: photoIds },
-            user: req.user.id,
-            isTrashed: true
-        });
-
-        res.json({
-            success: true,
-            message: `${result.deletedCount} photos permanently deleted`,
-            deletedIds: photoIds
-        });
+        const result = await photoModel.deleteMany({ _id: { $in: photoIds }, user: req.user.id, isTrashed: true });
+        res.json({ success: true, message: `${result.deletedCount} photos permanently deleted`, deletedIds: photoIds });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// Auto-delete photos that have been in trash for more than 30 days
 exports.autoDeleteExpiredTrash = async (req, res) => {
     try {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        const result = await Photo.deleteMany({
-            user: req.user.id,
-            isTrashed: true,
-            trashedAt: { $lt: thirtyDaysAgo }
-        });
-
-        res.json({
-            success: true,
-            message: `${result.deletedCount} expired photos auto-deleted`,
-            deletedCount: result.deletedCount
-        });
+        const result = await photoModel.deleteMany({ user: req.user.id, isTrashed: true, trashedAt: { $lt: thirtyDaysAgo } });
+        res.json({ success: true, message: `${result.deletedCount} expired photos auto-deleted`, deletedCount: result.deletedCount });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        });
+        res.status(500).json({ success: false, message: error.message });
     }
 };

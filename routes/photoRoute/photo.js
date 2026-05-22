@@ -1,7 +1,9 @@
-// routes/photoRoute/photo.js
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../../middleware/AuthMiddleware');
+const upload = require('../../config/multer');
+
+// Import from controller - note the path goes to the folder, then the file
 const {
     uploadPhotos,
     getAllPhotos,
@@ -22,7 +24,6 @@ const {
     permanentlyDeletePhotos,
     autoDeleteExpiredTrash
 } = require('../../controller/photoController/photo');
-const upload = require('../../config/multer');
 
 // Protect all routes
 router.use(authMiddleware);
@@ -30,7 +31,7 @@ router.use(authMiddleware);
 // Upload route
 router.post('/upload', upload.array('photos', 50), uploadPhotos);
 
-// Trash routes (add these BEFORE the :id route)
+// Trash routes
 router.put('/trash', moveToTrash);
 router.put('/restore', restoreFromTrash);
 router.get('/trash', getTrashedPhotos);
@@ -49,7 +50,7 @@ router.get('/face-count/:minFaces', getPhotosByFaceCount);
 // Star/Favorite route
 router.patch('/:id/star', toggleStar);
 
-// CRUD routes (keep these at the end)
+// CRUD routes
 router.route('/')
     .get(getAllPhotos);
 

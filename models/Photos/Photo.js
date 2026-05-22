@@ -1,4 +1,3 @@
-// models/photoModel.js
 const mongoose = require('mongoose');
 
 const PhotoSchema = new mongoose.Schema({
@@ -14,8 +13,10 @@ const PhotoSchema = new mongoose.Schema({
   thumbnailUrl: {
     type: String
   },
-
-  // ── EXACT DIRECTORY COGNITIVE TAXONOMY MATCHES ──
+  title: {
+    type: String,
+    default: ''
+  },
   sceneCategory: {
     type: String,
     enum: ['Party', 'Event', 'Trip', 'General'],
@@ -43,6 +44,10 @@ const PhotoSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isStarred: {
+    type: Boolean,
+    default: false
+  },
   tags: {
     type: [String],
     default: []
@@ -50,7 +55,7 @@ const PhotoSchema = new mongoose.Schema({
   format: String,
   size: Number,
   
-  // ── TRASH FIELDS (ADD THESE) ──
+  // Trash fields
   isTrashed: {
     type: Boolean,
     default: false
@@ -58,23 +63,13 @@ const PhotoSchema = new mongoose.Schema({
   trashedAt: {
     type: Date,
     default: null
-  },
-  isDuplicate: {
-    type: Boolean,
-    default: false
-  },
-  duplicateOf: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Photo',
-    default: null
   }
 }, {
   timestamps: true
 });
 
-// Add index for trash queries
 PhotoSchema.index({ user: 1, isTrashed: 1, trashedAt: 1 });
-PhotoSchema.index({ user: 1, sceneCategory: 1, environment: 1, socialGroup: 1 });
+PhotoSchema.index({ user: 1, sceneCategory: 1 });
 PhotoSchema.index({ user: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Photo', PhotoSchema);
