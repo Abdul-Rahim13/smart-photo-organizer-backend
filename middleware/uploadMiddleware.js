@@ -9,13 +9,11 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/'); // Ensure the 'uploads' folder exists in your backend root
     },
-    filename: (req, file, cb) => {
-        // Normalize filename string mutations
-        const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
-        cb(null, `${Date.now()}-${sanitizedName}`);
+    filename: function (req, file, cb) {
+        cb(null, `${Date.now()}-${file.originalname}`);
     }
 });
 

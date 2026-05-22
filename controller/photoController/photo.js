@@ -1,10 +1,10 @@
-const fs = require('fs')
-const path = require('path')
-const photoModel = require('../../models/Photos/Photo')
+const fs = require('fs');
+const path = require('path');
+const photoModel = require('../../models/Photos/Photo');
 
 exports.uploadPhoto = async (req, res) => {
     try {
-        // 1. Handle both multer setups: upload.array() [req.files] or upload.single() [req.file]
+        // 1. Safe extraction array for handling both array and single file uploads
         let uploadedFiles = [];
         if (req.files && Array.isArray(req.files)) {
             uploadedFiles = req.files;
@@ -13,42 +13,48 @@ exports.uploadPhoto = async (req, res) => {
         }
 
         if (uploadedFiles.length === 0) {
+            console.error("❌ Multer Configuration Breakdown: No files found in request pipeline.");
             return res.status(400).json({
                 success: false,
                 message: "No binary files detected in the request payload structure."
             });
         }
 
-        // 2. Fallback User Verification to protect against middleware drops
-        const fallbackUserId = req.user && req.user.id ? req.user.id : "65f1a2b3c4d5e6f7a8b9c0d1"; 
+        // 2. Validate user identity object mapping properties
+        if (!req.user || !req.user.id) {
+            console.error("❌ Authorization Error: req.user.id is empty or missing.");
+            return res.status(401).json({
+                success: false,
+                message: "Authentication failed. User missing from request scope."
+            });
+        }
 
-        // Expanded mapping matrix to support standard AI taxonomy outputs
-        const categoryMap = {
-            'Events': 'event',
-            'Event': 'event',
-            'Outdoor': 'outdoor',
-            'Indoor': 'indoor',
-            'Party': 'party',
-            'Trip': 'trip',
-            'General': 'general'
-        };
-
-        // 3. Process array safely
+        // 3. Map file records securely
         const photos = uploadedFiles.map(file => {
-            const rawCategory = req.body.sceneCategory || req.body.category || 'General';
-            const parsedCategory = categoryMap[rawCategory] || rawCategory.toLowerCase();
+            // Preserve proper PascalCase names so your frontend taxonomy matches perfectly!
+            let targetCategory = "General";
+            const receivedCategory = req.body.sceneCategory || req.body.category;
             
+            if (receivedCategory) {
+                const normalized = receivedCategory.trim().toLowerCase();
+                if (normalized === 'party') targetCategory = 'Party';
+                else if (normalized === 'event' || normalized === 'events') targetCategory = 'Event';
+                else if (normalized === 'trip' || normalized === 'tour') targetCategory = 'Trip';
+            }
+
             const realFaceCount = req.body.faceCount ? parseInt(req.body.faceCount, 10) : 1;
             const realQuality = req.body.qualityScore ? parseInt(req.body.qualityScore, 10) : 85;
 
-            // Safe parsing wrapper for tag payloads to stop 500 crashes
-            let parsedTags = [];
+            // Safe parsing wrapper for stringified arrays sent from frontend FormData
+            let parsedTags = ['Live_DB_Upload'];
             if (req.body.tags) {
                 try {
-                    parsedTags = typeof req.body.tags === 'string' ? JSON.parse(req.body.tags) : req.body.tags;
+                    const incomingTags = typeof req.body.tags === 'string' ? JSON.parse(req.body.tags) : req.body.tags;
+                    if (Array.isArray(incomingTags)) {
+                        parsedTags = [...new Set([...parsedTags, ...incomingTags])];
+                    }
                 } catch (e) {
-                    console.warn("⚠️ Tag parsing optimization warning, falling back to raw string split");
-                    parsedTags = [String(req.body.tags)];
+                    parsedTags.push(String(req.body.tags));
                 }
             }
 
@@ -56,28 +62,30 @@ exports.uploadPhoto = async (req, res) => {
                 imageUrl: `${req.protocol}://${req.get('host')}/uploads/${file.filename}`,
                 format: file.mimetype || 'image/jpeg',
                 size: file.size || 0,
-                user: fallbackUserId, 
-                sceneCategory: parsedCategory, 
-                faceCount: realFaceCount,      
-                qualityScore: realQuality,     
+                user: req.user.id,
+                sceneCategory: targetCategory, // Fixed string formatting
+                category: targetCategory,      // Injects both keys for cross-compatibility
+                faceCount: realFaceCount,
+                qualityScore: realQuality,
                 isFlagged: realQuality < 30,
-                tags: Array.isArray(parsedTags) ? parsedTags : []
+                tags: parsedTags
             };
         });
 
-        console.log("💾 Prepared photo objects for MongoDB insertion:", photos);
+        console.log("💾 Executing insertMany to MongoDB cluster instance:", photos);
 
-        // 4. Save directly into MongoDB Cluster
+        // 4. Atomic Database Insert Statement
         const savedPhotos = await photoModel.insertMany(photos);
 
         return res.status(201).json({
             success: true,
             message: "Images uploaded and classified successfully via AI",
+            photo: savedPhotos[0], // Return single photo reference structure back to client
             data: savedPhotos
         });
 
     } catch (error) {
-        console.error("❌ CRITICAL BACKEND CONTROLLER ERROR:", error);
+        console.error("❌ CRITICAL BACKEND CONTROLLER EXCEPTION:", error);
         return res.status(500).json({
             success: false,
             message: "Upload transaction dropped at processing layer",
@@ -86,208 +94,118 @@ exports.uploadPhoto = async (req, res) => {
     }
 };
 
+// ── EXTENDED CRITICAL FETCH API ADAPTERS ──────────────────────────────────
 exports.getAllPhotos = async (req, res) => {
     try {
-        const photos = await photoModel.find({user: req.user.id,}).sort({createdAt: -1})
-
-        res.status(200).json({
-            success: true,
-            message: "Images fetched successfully",
-            data: photos
-        })
-
+        const photos = await photoModel.find({ user: req.user.id }).sort({ createdAt: -1 });
+        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        })
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
 
 exports.filterPhotos = async (req, res) => {
     try {
-        const {scene, minFaces, minQuality, tag} = req.query
+        const { scene, minFaces, minQuality, tag } = req.query;
+        let filter = { user: req.user.id };
 
-        let filter = {user: req.user.id}
+        if (scene) filter.sceneCategory = scene;
+        if (minFaces) filter.faceCount = { $gte: Number(minFaces) };
+        if (minQuality) filter.qualityScore = { $gte: Number(minQuality) };
+        if (tag) filter.tags = { $in: [tag] };
 
-        if (scene) filter.sceneCategory = scene
-        if (minFaces) filter.faceCount = { $gte: Number(minFaces) }
-        if(minQuality) filter.qualityScore = { $gte: Number(minQuality) }
-        if (tag) filter.tags = { $in: [tag] }
-
-        const photos = await photoModel.find(filter).sort({createdAt: -1})
-
-        res.status(200).json({
-            success: true,
-            message: "Images fetched successfully",
-            data: photos
-        })
-
+        const photos = await photoModel.find(filter).sort({ createdAt: -1 });
+        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
-        })
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
 
 exports.getByScene = async (req, res) => {
     try {
-        const photos = await photoModel.find({user: req.user.id, sceneCategory: req.params.type}).sort({createdAt: -1})
-
-        res.status(200).json({
-            success: true,
-            message: "Images fetched successfully",
-            data: photos
-        })
-
+        const photos = await photoModel.find({ user: req.user.id, sceneCategory: req.params.type }).sort({ createdAt: -1 });
+        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
-        })
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
 
 exports.getTopPhotos = async (req, res) => {
     try {
-        const photos = await photoModel.find({user: req.user.id, qualityScore: {$gte: 70}}).sort({qualityScore: -1 })
-        
-        res.status(200).json({
-            success: true,
-            message: "Images fetched successfully",
-            data: photos
-        })
+        const photos = await photoModel.find({ user: req.user.id, qualityScore: { $gte: 70 } }).sort({ qualityScore: -1 });
+        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
-        })
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
 
 exports.getPhotosWithFaces = async (req, res) => {
     try {
-
-        const min = req.query.min || 1
-
-        const photos = await photoModel.find({user: req.user.id, faceCount: {$gte: Number(min)}})
-
-        res.status(200).json({
-            success: true,
-            message: "Images fetched successfully",
-            data: photos
-        })
+        const min = req.query.min || 1;
+        const photos = await photoModel.find({ user: req.user.id, faceCount: { $gte: Number(min) } });
+        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
-        })
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
 
 exports.getFlaggedPhotos = async (req, res) => {
     try {
-        const photos = await photoModel.find({user: req.user.id, isFlagged: true})
-
-        res.status(200).json({
-            success: true,
-            message: "Images fetched successfully",
-            data: photos
-        })
+        const photos = await photoModel.find({ user: req.user.id, isFlagged: true });
+        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
-        })
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
 
 exports.searchPhotos = async (req, res) => {
     try {
-        
-        const {tag} = req.query
-
-        const photos = await photoModel.find({user: req.user.id, tags: {$in:[tag]}})
-
-        res.status(200).json({
-            success: true,
-            message: "Images fetched successfully",
-            data: photos
-        })
+        const { tag } = req.query;
+        const photos = await photoModel.find({ user: req.user.id, tags: { $in: [tag] } });
+        return res.status(200).json({ success: true, message: "Images fetched successfully", data: photos });
     } catch (error) {
-        res.status(500).json({ 
-            success: false, 
-            message: error.message 
-        })
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
 
 exports.deletePhoto = async (req, res) => {
     try {
-        const photo = await photoModel.findOne({_id: req.params.id, user: req.user.id})
-
-        if(!photo) {
-            return res.status(404).json({
-                success: false,
-                message: "Photo not found"
-            })
+        const photo = await photoModel.findOne({ _id: req.params.id, user: req.user.id });
+        if (!photo) {
+            return res.status(404).json({ success: false, message: "Photo not found" });
         }
 
-        const filePath = path.join(__dirname, '../../uploads', photo.imageUrl.split('/uploads')[1])
-
+        const filePath = path.join(__dirname, '../../uploads', photo.imageUrl.split('/uploads')[1]);
         if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath)
+            fs.unlinkSync(filePath);
         }
 
-        await photoModel.findByIdAndDelete(req.params.id)
-
-        res.status(200).json({
-            success: true,
-            message: "Photo deleted successfully"
-        })
+        await photoModel.findByIdAndDelete(req.params.id);
+        return res.status(200).json({ success: true, message: "Photo deleted successfully" });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        })
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
 
 exports.updatePhotoMetadata = async (req, res) => {
     try {
-        const {sceneCategory, faceCount, qualityScore, tags} = req.body
+        const { sceneCategory, faceCount, qualityScore, tags } = req.body;
+        const photo = await photoModel.findOne({ _id: req.params.id, user: req.user.id });
 
-        const photo = await photoModel.findOne({
-            _id: req.params.id,
-            user: req.user.id
-        })
-
-        if(!photo) {
-            return res.status(404).json({
-                success: false,
-                message: "Photo not found"
-            })
+        if (!photo) {
+            return res.status(404).json({ success: false, message: "Photo not found" });
         }
 
-        if (sceneCategory) photo.sceneCategory = sceneCategory
-        if (faceCount !== undefined) photo.faceCount = Number(faceCount)
-        if (qualityScore !== undefined) photo.qualityScore = Number(qualityScore)
-        if (tags) photo.tags = tags
+        if (sceneCategory) photo.sceneCategory = sceneCategory;
+        if (faceCount !== undefined) photo.faceCount = Number(faceCount);
+        if (qualityScore !== undefined) photo.qualityScore = Number(qualityScore);
+        if (tags) photo.tags = tags;
 
-        photo.isFlagged = photo.qualityScore < 30
+        photo.isFlagged = photo.qualityScore < 30;
+        await photo.save();
 
-        await photo.save()
-
-        res.status(200).json({
-            success: true,
-            message: "Metadata updated successfully",
-            data: photo
-        })
+        return res.status(200).json({ success: true, message: "Metadata updated successfully", data: photo });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        })
+        return res.status(500).json({ success: false, message: error.message });
     }
-}
+};
