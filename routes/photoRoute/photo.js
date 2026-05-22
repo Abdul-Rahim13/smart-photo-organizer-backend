@@ -1,7 +1,7 @@
 // routes/photoRoute/photo.js
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../../middleware/authMiddleware');
+const { protect } = require('../../middleware/AuthMiddleware');
 const {
     uploadPhotos,
     getAllPhotos,
