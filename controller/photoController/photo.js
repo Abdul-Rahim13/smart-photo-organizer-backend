@@ -25,11 +25,14 @@ const normalizeTags = (tags) => {
 exports.uploadPhoto = async (req, res) => {
   try {
     console.log('=== UPLOAD START ===');
-    console.log('Files received:', req.files?.length || 0);
-    console.log('User ID:', req.user?.id);
+    console.log('Files:', req.files?.length);
+    console.log('User:', req.user?.id);
     
     if (!req.files || !req.files.length) {
-      return res.status(400).json({ success: false, message: "No files uploaded" });
+      return res.status(400).json({ 
+        success: false, 
+        message: "No files uploaded" 
+      });
     }
 
     const photos = req.files.map(file => ({
@@ -50,24 +53,23 @@ exports.uploadPhoto = async (req, res) => {
       trashedAt: null
     }));
 
-    console.log('Saving photos to DB...');
     const saved = await photoModel.insertMany(photos);
-    console.log('Saved successfully:', saved.length);
     
-    res.status(201).json({ success: true, data: saved });
+    res.status(201).json({ 
+      success: true, 
+      data: saved 
+    });
     
   } catch (err) {
-    // Proper error logging
-    console.error('=== UPLOAD ERROR ===');
-    console.error('Error name:', err.name);
-    console.error('Error message:', err.message);
+    // IMPORTANT: Log the actual error
+    console.error('Upload error:', err);
     console.error('Error stack:', err.stack);
     
-    // Send proper error response
+    // Send JSON response, not HTML
     res.status(500).json({ 
       success: false, 
       message: err.message,
-      errorType: err.name
+      error: err.toString()
     });
   }
 };

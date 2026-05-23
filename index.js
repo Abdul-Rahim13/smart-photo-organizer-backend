@@ -50,3 +50,12 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
+// Add this after all your routes
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
+  res.status(500).json({ 
+    success: false, 
+    message: err.message || 'Internal server error'
+  });
+});
