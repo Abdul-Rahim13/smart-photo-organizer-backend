@@ -1,3 +1,4 @@
+// backend/services/aiAnalysis.js
 const axios = require('axios');
 
 const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
@@ -10,84 +11,103 @@ async function analyzeWithHuggingFace(imageBuffer) {
       environment: 'Indoor',
       socialGroup: 'Solo',
       faceCount: 1,
-      qualityScore: 85,
-      isFlagged: false
+      qualityScore: 85
     };
   }
 
   try {
-    // 1. Indoor/Outdoor Detection
-    console.log('📡 Analyzing indoor/outdoor...');
-    const indoorOutdoorResult = await axios.post(
-      'https://api-inference.huggingface.co/models/prithivMLmods/IndoorOutdoorNet',
-      imageBuffer,
-      { 
-        headers: { Authorization: `Bearer ${HF_API_KEY}` }, 
-        timeout: 30000 
-      }
-    );
+    console.log('🔍 Starting AI Analysis...');
     
+    // 1. INDOOR/OUTDOOR DETECTION
+    console.log('  📍 Detecting Indoor/Outdoor...');
     let environment = 'Indoor';
-    if (indoorOutdoorResult.data && indoorOutdoorResult.data[0]) {
-      const predictions = indoorOutdoorResult.data[0];
-      const indoorScore = predictions.find(p => p.label === 'indoor')?.score || 0;
-      const outdoorScore = predictions.find(p => p.label === 'outdoor')?.score || 0;
-      environment = outdoorScore > indoorScore ? 'Outdoor' : 'Indoor';
-      console.log(`   Environment: ${environment} (indoor:${indoorScore}, outdoor:${outdoorScore})`);
-    }
-
-    // 2. Scene Classification
-    console.log('📡 Analyzing scene...');
-    const sceneResult = await axios.post(
-      'https://api-inference.huggingface.co/models/microsoft/resnet-50',
-      imageBuffer,
-      { headers: { Authorization: `Bearer ${HF_API_KEY}` }, timeout: 30000 }
-    );
-    
-    let sceneCategory = 'General';
-    const sceneKeywords = {
-      'Party': ['party', 'celebration', 'birthday', 'concert', 'dance', 'nightclub', 'festival'],
-      'Event': ['wedding', 'conference', 'meeting', 'ceremony', 'graduation', 'award'],
-      'Trip': ['beach', 'mountain', 'forest', 'landmark', 'tourist', 'nature', 'travel', 'vacation'],
-      'General': ['office', 'home', 'street', 'city', 'studio', 'person', 'people']
-    };
-    
-    if (sceneResult.data && sceneResult.data[0]) {
-      const labels = sceneResult.data[0].labels || [];
-      for (let i = 0; i < labels.length; i++) {
-        const label = labels[i].toLowerCase();
-        for (const [category, keywords] of Object.entries(sceneKeywords)) {
-          if (keywords.some(keyword => label.includes(keyword))) {
-            sceneCategory = category;
-            break;
-          }
+    try {
+      const indoorOutdoor = await axios.post(
+        'https://api-inference.huggingface.co/models/prithivMLmods/IndoorOutdoorNet',
+        imageBuffer,
+        { 
+          headers: { Authorization: `Bearer ${HF_API_KEY}` },
+          timeout: 30000
         }
-        if (sceneCategory !== 'General') break;
+      );
+      
+      if (indoorOutdoor.data && indoorOutdoor.data[0]) {
+        const indoor = indoorOutdoor.data[0].find(p => p.label === 'indoor')?.score || 0;
+        const outdoor = indoorOutdoor.data[0].find(p => p.label === 'outdoor')?.score || 0;
+        environment = outdoor > indoor ? 'Outdoor' : 'Indoor';
+        console.log(`     → Environment: ${environment} (indoor:${indoor}, outdoor:${outdoor})`);
       }
-      console.log(`   Scene: ${sceneCategory}`);
+    } catch (err) {
+      console.log(`     → Environment detection failed: ${err.message}`);
     }
 
-    // 3. Face Detection
-    console.log('📡 Detecting faces...');
-    const faceResult = await axios.post(
-      'https://api-inference.huggingface.co/models/arnabdhar/YOLOv8-Face-Detection',
-      imageBuffer,
-      { headers: { Authorization: `Bearer ${HF_API_KEY}` }, timeout: 30000 }
-    );
-    
+    // 2. SCENE CLASSIFICATION (Party/Event/Trip/General)
+    console.log('  📍 Detecting Scene...');
+    let sceneCategory = 'General';
+    try {
+      const scene = await axios.post(
+        'https://api-inference.huggingface.co/models/microsoft/resnet-50',
+        imageBuffer,
+        { 
+          headers: { Authorization: `Bearer ${HF_API_KEY}` },
+          timeout: 30000
+        }
+      );
+      
+      const keywords = {
+        'Party': ['party', 'celebration', 'birthday', 'concert', 'dance', 'nightclub', 'festival', 'musician', 'band'],
+        'Event': ['wedding', 'conference', 'meeting', 'ceremony', 'graduation', 'award', 'red carpet', 'stage'],
+        'Trip': ['beach', 'mountain', 'forest', 'landmark', 'tourist', 'nature', 'travel', 'vacation', 'ocean', 'desert', 'lake', 'river', 'park']
+      };
+      
+      if (scene.data && scene.data[0] && scene.data[0].labels) {
+        for (const label of scene.data[0].labels.slice(0, 5)) {
+          const l = label.toLowerCase();
+          for (const [cat, words] of Object.entries(keywords)) {
+            if (words.some(word => l.includes(word))) {
+              sceneCategory = cat;
+              console.log(`     → Scene match: ${label} → ${cat}`);
+              break;
+            }
+          }
+          if (sceneCategory !== 'General') break;
+        }
+      }
+      console.log(`     → Scene Category: ${sceneCategory}`);
+    } catch (err) {
+      console.log(`     → Scene detection failed: ${err.message}`);
+    }
+
+    // 3. FACE DETECTION
+    console.log('  📍 Detecting Faces...');
     let faceCount = 0;
     let socialGroup = 'Empty';
-    
-    if (faceResult.data && Array.isArray(faceResult.data)) {
-      faceCount = faceResult.data.filter(item => item.label === 'face' || item.label === 'person').length;
-      if (faceCount === 1) socialGroup = 'Solo';
-      else if (faceCount === 2) socialGroup = 'Couple';
-      else if (faceCount >= 3) socialGroup = 'Group';
-      console.log(`   Faces: ${faceCount} → ${socialGroup}`);
+    try {
+      const faces = await axios.post(
+        'https://api-inference.huggingface.co/models/arnabdhar/YOLOv8-Face-Detection',
+        imageBuffer,
+        { 
+          headers: { Authorization: `Bearer ${HF_API_KEY}` },
+          timeout: 30000
+        }
+      );
+      
+      if (faces.data && Array.isArray(faces.data)) {
+        faceCount = faces.data.filter(f => f.label === 'face' || f.label === 'person').length;
+        if (faceCount === 0) socialGroup = 'Empty';
+        else if (faceCount === 1) socialGroup = 'Solo';
+        else if (faceCount === 2) socialGroup = 'Couple';
+        else socialGroup = 'Group';
+        console.log(`     → Faces found: ${faceCount} → ${socialGroup}`);
+      }
+    } catch (err) {
+      console.log(`     → Face detection failed: ${err.message}`);
     }
 
-    // 4. Quality Score (using image clarity - simplified for now)
+    // 4. QUALITY SCORE
     const qualityScore = Math.floor(Math.random() * 25) + 70;
+    
+    console.log(`✅ AI Analysis Complete: ${sceneCategory} | ${environment} | ${socialGroup} | ${faceCount} faces`);
     
     return {
       sceneCategory,

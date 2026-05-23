@@ -26,6 +26,7 @@ const normalizeTags = (tags) => {
 exports.uploadPhoto = async (req, res) => {
   try {
     console.log('=== UPLOAD START ===');
+    console.log('Files received:', req.files?.length);
     
     if (!req.files || !req.files.length) {
       return res.status(400).json({ success: false, message: "No files uploaded" });
@@ -34,34 +35,35 @@ exports.uploadPhoto = async (req, res) => {
     const photos = [];
     
     for (const file of req.files) {
-      console.log(`📷 Analyzing: ${file.originalname}`);
+      console.log(`\n📷 Processing: ${file.originalname}`);
+      console.log(`   Cloudinary URL: ${file.path}`);
       
+      // Run AI analysis
       let aiAnalysis = {
-        sceneCategory: req.body.sceneCategory || "General",
-        environment: req.body.environment || "Indoor",
-        socialGroup: req.body.socialGroup || "Solo",
-        faceCount: Number(req.body.faceCount) || 1,
-        qualityScore: Number(req.body.qualityScore) || 85,
+        sceneCategory: 'General',
+        environment: 'Indoor',
+        socialGroup: 'Solo',
+        faceCount: 1,
+        qualityScore: 85,
         isFlagged: false
       };
       
-      // Run AI analysis if API key exists
-      if (process.env.HUGGINGFACE_API_KEY && file.path) {
-        try {
-          // Download image from Cloudinary for analysis
-          const imageResponse = await axios.get(file.path, { 
-            responseType: 'arraybuffer',
-            timeout: 30000
-          });
-          const imageBuffer = Buffer.from(imageResponse.data);
-          
-          aiAnalysis = await analyzeWithHuggingFace(imageBuffer);
-          console.log('✅ AI Analysis complete:', aiAnalysis);
-        } catch (aiError) {
-          console.error('AI Analysis failed:', aiError.message);
-        }
-      } else {
-        console.log('⚠️ Skipping AI analysis (no API key or invalid file path)');
+      // Download image from Cloudinary for AI analysis
+      try {
+        console.log('   🔍 Downloading image for AI analysis...');
+        const imageResponse = await axios.get(file.path, { 
+          responseType: 'arraybuffer',
+          timeout: 30000
+        });
+        const imageBuffer = Buffer.from(imageResponse.data);
+        
+        console.log('   🧠 Running Hugging Face AI...');
+        aiAnalysis = await analyzeWithHuggingFace(imageBuffer);
+        console.log(`   ✅ AI Result: ${aiAnalysis.sceneCategory} | ${aiAnalysis.environment} | ${aiAnalysis.socialGroup}`);
+        
+      } catch (aiError) {
+        console.error(`   ⚠️ AI Analysis failed: ${aiError.message}`);
+        console.log('   → Using default values');
       }
       
       photos.push({
@@ -84,7 +86,7 @@ exports.uploadPhoto = async (req, res) => {
     }
     
     const saved = await photoModel.insertMany(photos);
-    console.log(`✅ Saved ${saved.length} photos with AI analysis`);
+    console.log(`\n✅ Saved ${saved.length} photos with AI analysis`);
     
     res.status(201).json({ 
       success: true, 
@@ -93,7 +95,7 @@ exports.uploadPhoto = async (req, res) => {
     });
     
   } catch (err) {
-    console.error("Upload error:", err);
+    console.error("❌ Upload error:", err);
     res.status(500).json({ success: false, message: err.message });
   }
 };
