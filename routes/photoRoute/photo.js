@@ -3,9 +3,8 @@ const router = express.Router();
 const { authMiddleware } = require('../../middleware/AuthMiddleware');
 const upload = require('../../middleware/uploadMiddleware');
 
-// Import from controller - note the path goes to the folder, then the file
 const {
-    uploadPhotos,
+    uploadPhoto,
     getAllPhotos,
     getPhotoById,
     updatePhoto,
@@ -25,20 +24,19 @@ const {
     autoDeleteExpiredTrash
 } = require('../../controller/photoController/photo');
 
-// Protect all routes
 router.use(authMiddleware);
 
-// Upload route
-router.post('/upload', upload.array('photos', 50), uploadPhotos);
+// Upload - specific path first
+router.post('/upload', upload.array('photos', 50), uploadPhoto);
 
-// Trash routes
+// Trash system
 router.put('/trash', moveToTrash);
 router.put('/restore', restoreFromTrash);
 router.get('/trash', getTrashedPhotos);
 router.delete('/permanent', permanentlyDeletePhotos);
 router.delete('/auto-delete-expired', autoDeleteExpiredTrash);
 
-// Filter and search routes
+// Filters with specific params (place BEFORE generic /:id routes)
 router.get('/filter', filterPhotos);
 router.get('/search', searchPhotos);
 router.get('/top', getTopRatedPhotos);
@@ -47,10 +45,10 @@ router.get('/flagged', getFlaggedPhotos);
 router.get('/scene/:scene', getPhotosByScene);
 router.get('/face-count/:minFaces', getPhotosByFaceCount);
 
-// Star/Favorite route
+// Star - uses :id but is a PATCH method
 router.patch('/:id/star', toggleStar);
 
-// CRUD routes
+// CRUD - generic routes LAST
 router.route('/')
     .get(getAllPhotos);
 

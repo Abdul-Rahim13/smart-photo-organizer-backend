@@ -10,6 +10,10 @@ const PhotoSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Original image path is required']
   },
+  publicId: {  // ADD THIS
+    type: String,
+    required: true
+  },
   thumbnailUrl: {
     type: String
   },
@@ -31,6 +35,10 @@ const PhotoSchema = new mongoose.Schema({
     type: String,
     enum: ['Solo', 'Couple', 'Group', 'Empty'],
     default: 'Solo'
+  },
+  category: {  // ADD THIS if you want to keep it
+    type: String,
+    default: 'General'
   },
   faceCount: {
     type: Number,
@@ -68,8 +76,11 @@ const PhotoSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Indexes
 PhotoSchema.index({ user: 1, isTrashed: 1, trashedAt: 1 });
 PhotoSchema.index({ user: 1, sceneCategory: 1 });
 PhotoSchema.index({ user: 1, createdAt: -1 });
+PhotoSchema.index({ user: 1, isStarred: 1 });
+PhotoSchema.index({ user: 1, qualityScore: -1 });
 
 module.exports = mongoose.model('Photo', PhotoSchema);

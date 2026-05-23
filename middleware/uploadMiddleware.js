@@ -1,36 +1,22 @@
-const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+const cloudinary = require("../config/cloud");
 
-// Guarantee directory footprint exists before file stream buffers
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/'); // Ensure the 'uploads' folder exists in your backend root
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "FYP",
+    format: async (req, file) => {
+      const ext = file.originalname.split('.').pop().toLowerCase();
+      return ['jpg', 'jpeg', 'png'].includes(ext) ? ext : 'jpg';
     },
-    filename: function (req, file, cb) {
-        cb(null, `${Date.now()}-${file.originalname}`);
-    }
+    public_id: (req, file) => `${Date.now()}-${file.originalname.replace(/\s+/g, "-").split('.')[0]}`
+  }
 });
 
-const fileFilter = (req, file, cb) => {
-    const allowedTypes = /image\/jpeg|image\/jpg|image\/png/;
-    
-    if (allowedTypes.test(file.mimetype)) {
-        cb(null, true);
-    } else {
-        cb(new Error('Only images (JPEG/JPG/PNG) are supported!'), false);
-    }
-};
-
-const upload = multer({
-    storage,
-    fileFilter,
-    limits: { fileSize: 10 * 1024 * 1024 } // Bumped up to 10MB safely for high-res images
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
 module.exports = upload;

@@ -3,24 +3,22 @@ const albumModel = require('../../models/Album/Album')
 exports.createAlbum = async (req, res) => {
     try {
         const {title, description} = req.body
-
         const album = await albumModel.create({
             user: req.user.id,
             title, 
             description
         })
-
-        res.status(201).json({
-            success: true,
-            data: album
-        })
+        res.status(201).json({ success: true, data: album })
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: error.message
-        })
+        if (error.code === 11000) { // Duplicate key error
+            return res.status(400).json({
+                success: false,
+                message: "You already have an album with this title"
+            });
+        }
+        res.status(500).json({ success: false, message: error.message })
     }
-} 
+}
 
 exports.getUserAlbums = async (req, res) => {
     try {
