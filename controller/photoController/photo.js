@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const photoModel = require("../../models/Photos/Photo");
 const cloudinary = require("../../config/cloud");
+const analyzeWithHuggingFace = require('../../service/aiAnalysis');
 
 /* ---------------- HELPERS ---------------- */
 
@@ -25,52 +26,75 @@ const normalizeTags = (tags) => {
 exports.uploadPhoto = async (req, res) => {
   try {
     console.log('=== UPLOAD START ===');
-    console.log('Files:', req.files?.length);
-    console.log('User:', req.user?.id);
     
     if (!req.files || !req.files.length) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "No files uploaded" 
+      return res.status(400).json({ success: false, message: "No files uploaded" });
+    }
+    
+    const photos = [];
+    
+    for (const file of req.files) {
+      console.log(`📷 Analyzing: ${file.originalname}`);
+      
+      let aiAnalysis = {
+        sceneCategory: req.body.sceneCategory || "General",
+        environment: req.body.environment || "Indoor",
+        socialGroup: req.body.socialGroup || "Solo",
+        faceCount: Number(req.body.faceCount) || 1,
+        qualityScore: Number(req.body.qualityScore) || 85,
+        isFlagged: false
+      };
+      
+      // Run AI analysis if API key exists
+      if (process.env.HUGGINGFACE_API_KEY && file.path) {
+        try {
+          // Download image from Cloudinary for analysis
+          const imageResponse = await axios.get(file.path, { 
+            responseType: 'arraybuffer',
+            timeout: 30000
+          });
+          const imageBuffer = Buffer.from(imageResponse.data);
+          
+          aiAnalysis = await analyzeWithHuggingFace(imageBuffer);
+          console.log('✅ AI Analysis complete:', aiAnalysis);
+        } catch (aiError) {
+          console.error('AI Analysis failed:', aiError.message);
+        }
+      } else {
+        console.log('⚠️ Skipping AI analysis (no API key or invalid file path)');
+      }
+      
+      photos.push({
+        imageUrl: file.path,
+        publicId: file.filename,
+        user: req.user.id,
+        sceneCategory: aiAnalysis.sceneCategory,
+        category: aiAnalysis.sceneCategory,
+        environment: aiAnalysis.environment,
+        socialGroup: aiAnalysis.socialGroup,
+        faceCount: aiAnalysis.faceCount,
+        qualityScore: aiAnalysis.qualityScore,
+        isFlagged: aiAnalysis.isFlagged,
+        tags: normalizeTags(req.body.tags),
+        title: req.body.title || file.originalname.split('.')[0],
+        isStarred: false,
+        isTrashed: false,
+        trashedAt: null
       });
     }
-
-    const photos = req.files.map(file => ({
-      imageUrl: file.path,
-      publicId: file.filename,
-      user: req.user.id,
-      sceneCategory: req.body.sceneCategory || "General",
-      category: req.body.category || "General",
-      faceCount: Number(req.body.faceCount) || 1,
-      qualityScore: Number(req.body.qualityScore) || 85,
-      isFlagged: (Number(req.body.qualityScore) || 85) < 30,
-      tags: normalizeTags(req.body.tags),
-      title: req.body.title || null,
-      environment: req.body.environment || null,
-      socialGroup: req.body.socialGroup || null,
-      isStarred: false,
-      isTrashed: false,
-      trashedAt: null
-    }));
-
+    
     const saved = await photoModel.insertMany(photos);
+    console.log(`✅ Saved ${saved.length} photos with AI analysis`);
     
     res.status(201).json({ 
       success: true, 
-      data: saved 
+      data: saved,
+      aiAnalyzed: !!process.env.HUGGINGFACE_API_KEY
     });
     
   } catch (err) {
-    // IMPORTANT: Log the actual error
-    console.error('Upload error:', err);
-    console.error('Error stack:', err.stack);
-    
-    // Send JSON response, not HTML
-    res.status(500).json({ 
-      success: false, 
-      message: err.message,
-      error: err.toString()
-    });
+    console.error("Upload error:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 /* ---------------- GET ALL ---------------- */
