@@ -24,7 +24,10 @@ const normalizeTags = (tags) => {
 
 exports.uploadPhoto = async (req, res) => {
   try {
-    // Fix: Check if files exist
+    console.log('=== UPLOAD START ===');
+    console.log('Files received:', req.files?.length || 0);
+    console.log('User ID:', req.user?.id);
+    
     if (!req.files || !req.files.length) {
       return res.status(400).json({ success: false, message: "No files uploaded" });
     }
@@ -39,7 +42,6 @@ exports.uploadPhoto = async (req, res) => {
       qualityScore: Number(req.body.qualityScore) || 85,
       isFlagged: (Number(req.body.qualityScore) || 85) < 30,
       tags: normalizeTags(req.body.tags),
-      // Add default values for missing fields
       title: req.body.title || null,
       environment: req.body.environment || null,
       socialGroup: req.body.socialGroup || null,
@@ -48,14 +50,27 @@ exports.uploadPhoto = async (req, res) => {
       trashedAt: null
     }));
 
+    console.log('Saving photos to DB...');
     const saved = await photoModel.insertMany(photos);
+    console.log('Saved successfully:', saved.length);
+    
     res.status(201).json({ success: true, data: saved });
+    
   } catch (err) {
-    console.error("Upload error:", err); // Add logging
-    res.status(500).json({ success: false, message: err.message });
+    // Proper error logging
+    console.error('=== UPLOAD ERROR ===');
+    console.error('Error name:', err.name);
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    
+    // Send proper error response
+    res.status(500).json({ 
+      success: false, 
+      message: err.message,
+      errorType: err.name
+    });
   }
 };
-
 /* ---------------- GET ALL ---------------- */
 exports.getAllPhotos = async (req, res) => {
     try {

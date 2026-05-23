@@ -15,6 +15,17 @@ const albumRoute = require('./routes/albumRoute/album');
 // DB connect
 connectDB();
 
+// Add this BEFORE your routes
+app.get('/api/check-env', (req, res) => {
+  res.json({
+    cloud_name: process.env.CLOUD_NAME ? '✓ Set' : '✗ Missing',
+    cloud_api_key: process.env.CLOUD_API_KEY ? '✓ Set' : '✗ Missing',
+    cloud_api_secret: process.env.CLOUD_API_SECRET ? '✓ Set' : '✗ Missing',
+    node_env: process.env.NODE_ENV,
+    port: process.env.PORT
+  });
+});
+
 // Middlewares
 app.use(morgan('dev'));
 app.use(express.json());
