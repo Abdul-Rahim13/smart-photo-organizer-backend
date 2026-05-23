@@ -1,9 +1,12 @@
-// backend/services/aiAnalysis.js
 const axios = require('axios');
 
 const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
 
 async function analyzeWithHuggingFace(imageBuffer) {
+  console.log('🔍 Starting AI Analysis with Hugging Face...');
+  console.log(`   Image buffer size: ${imageBuffer?.length || 0} bytes`);
+  console.log(`   API Key exists: ${!!HF_API_KEY}`);
+  
   if (!HF_API_KEY) {
     console.log('⚠️ No Hugging Face API key, using default values');
     return {
@@ -11,15 +14,14 @@ async function analyzeWithHuggingFace(imageBuffer) {
       environment: 'Indoor',
       socialGroup: 'Solo',
       faceCount: 1,
-      qualityScore: 85
+      qualityScore: 85,
+      isFlagged: false
     };
   }
 
   try {
-    console.log('🔍 Starting AI Analysis...');
-    
     // 1. INDOOR/OUTDOOR DETECTION
-    console.log('  📍 Detecting Indoor/Outdoor...');
+    console.log('  📍 Calling Indoor/Outdoor model...');
     let environment = 'Indoor';
     try {
       const indoorOutdoor = await axios.post(
@@ -32,17 +34,18 @@ async function analyzeWithHuggingFace(imageBuffer) {
       );
       
       if (indoorOutdoor.data && indoorOutdoor.data[0]) {
-        const indoor = indoorOutdoor.data[0].find(p => p.label === 'indoor')?.score || 0;
-        const outdoor = indoorOutdoor.data[0].find(p => p.label === 'outdoor')?.score || 0;
+        const predictions = indoorOutdoor.data[0];
+        const indoor = predictions.find(p => p.label === 'indoor')?.score || 0;
+        const outdoor = predictions.find(p => p.label === 'outdoor')?.score || 0;
         environment = outdoor > indoor ? 'Outdoor' : 'Indoor';
-        console.log(`     → Environment: ${environment} (indoor:${indoor}, outdoor:${outdoor})`);
+        console.log(`     → Environment: ${environment} (indoor:${indoor.toFixed(3)}, outdoor:${outdoor.toFixed(3)})`);
       }
     } catch (err) {
-      console.log(`     → Environment detection failed: ${err.message}`);
+      console.log(`     ❌ Indoor/Outdoor failed: ${err.message}`);
     }
 
-    // 2. SCENE CLASSIFICATION (Party/Event/Trip/General)
-    console.log('  📍 Detecting Scene...');
+    // 2. SCENE CLASSIFICATION
+    console.log('  📍 Calling Scene Classification model...');
     let sceneCategory = 'General';
     try {
       const scene = await axios.post(
@@ -55,31 +58,34 @@ async function analyzeWithHuggingFace(imageBuffer) {
       );
       
       const keywords = {
-        'Party': ['party', 'celebration', 'birthday', 'concert', 'dance', 'nightclub', 'festival', 'musician', 'band'],
-        'Event': ['wedding', 'conference', 'meeting', 'ceremony', 'graduation', 'award', 'red carpet', 'stage'],
-        'Trip': ['beach', 'mountain', 'forest', 'landmark', 'tourist', 'nature', 'travel', 'vacation', 'ocean', 'desert', 'lake', 'river', 'park']
+        'Party': ['party', 'celebration', 'birthday', 'concert', 'dance', 'nightclub', 'festival'],
+        'Event': ['wedding', 'conference', 'meeting', 'ceremony', 'graduation', 'award'],
+        'Trip': ['beach', 'mountain', 'forest', 'landmark', 'tourist', 'nature', 'travel', 'vacation']
       };
       
       if (scene.data && scene.data[0] && scene.data[0].labels) {
-        for (const label of scene.data[0].labels.slice(0, 5)) {
+        const topLabels = scene.data[0].labels.slice(0, 5);
+        console.log(`     Top labels: ${topLabels.join(', ')}`);
+        
+        for (const label of topLabels) {
           const l = label.toLowerCase();
           for (const [cat, words] of Object.entries(keywords)) {
             if (words.some(word => l.includes(word))) {
               sceneCategory = cat;
-              console.log(`     → Scene match: ${label} → ${cat}`);
+              console.log(`     ✓ Match: "${label}" → ${cat}`);
               break;
             }
           }
           if (sceneCategory !== 'General') break;
         }
+        console.log(`     → Scene: ${sceneCategory}`);
       }
-      console.log(`     → Scene Category: ${sceneCategory}`);
     } catch (err) {
-      console.log(`     → Scene detection failed: ${err.message}`);
+      console.log(`     ❌ Scene classification failed: ${err.message}`);
     }
 
     // 3. FACE DETECTION
-    console.log('  📍 Detecting Faces...');
+    console.log('  📍 Calling Face Detection model...');
     let faceCount = 0;
     let socialGroup = 'Empty';
     try {
@@ -98,18 +104,15 @@ async function analyzeWithHuggingFace(imageBuffer) {
         else if (faceCount === 1) socialGroup = 'Solo';
         else if (faceCount === 2) socialGroup = 'Couple';
         else socialGroup = 'Group';
-        console.log(`     → Faces found: ${faceCount} → ${socialGroup}`);
+        console.log(`     → Faces: ${faceCount} → ${socialGroup}`);
       }
     } catch (err) {
-      console.log(`     → Face detection failed: ${err.message}`);
+      console.log(`     ❌ Face detection failed: ${err.message}`);
     }
 
-    // 4. QUALITY SCORE
     const qualityScore = Math.floor(Math.random() * 25) + 70;
     
-    console.log(`✅ AI Analysis Complete: ${sceneCategory} | ${environment} | ${socialGroup} | ${faceCount} faces`);
-    
-    return {
+    const result = {
       sceneCategory,
       environment,
       socialGroup,
@@ -118,8 +121,11 @@ async function analyzeWithHuggingFace(imageBuffer) {
       isFlagged: qualityScore < 30
     };
     
+    console.log(`✅ AI Analysis Complete:`, result);
+    return result;
+    
   } catch (error) {
-    console.error('❌ AI Analysis failed:', error.message);
+    console.error('❌ AI Analysis fatal error:', error.message);
     return {
       sceneCategory: 'General',
       environment: 'Indoor',
