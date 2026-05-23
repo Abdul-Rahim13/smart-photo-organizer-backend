@@ -16,7 +16,13 @@ const albumRoute = require('./routes/albumRoute/album')
 
 
 connectDB()
-app.use('/uploads', express.static('uploads'))
+app.use('/uploads', express.static('uploads', {
+  setHeaders: (res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  }
+}));
 app.use(morgan('dev'))                  // middleware for Express that logs every HTTP request coming to your server
 app.use(express.json())
 app.use(express.urlencoded({extended: true}))
