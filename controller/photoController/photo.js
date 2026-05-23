@@ -65,7 +65,7 @@ exports.uploadPhoto = async (req, res) => {
                     const imageBuffer = Buffer.from(imageResponse.data);
                     
                     console.log('   🧠 Running Hugging Face AI analysis...');
-                    aiAnalysis = await analyzeWithHuggingFace(imageBuffer);
+                     aiAnalysis = await analyzeWithHuggingFace(imageBuffer, file.originalname);
                     console.log(`   ✅ AI Analysis Result:`, aiAnalysis);
                     
                 } catch (aiError) {
