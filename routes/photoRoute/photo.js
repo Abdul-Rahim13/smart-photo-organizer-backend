@@ -57,4 +57,14 @@ router.route('/:id')
     .put(updatePhoto)
     .delete(deletePhoto);
 
+    router.get('/test-ai', async (req, res) => {
+  const analyzeWithHuggingFace = require('../../services/aiAnalysis');
+  const testResult = await analyzeWithHuggingFace(null);
+  res.json({ 
+    hasApiKey: !!process.env.HUGGINGFACE_API_KEY,
+    apiKeyPrefix: process.env.HUGGINGFACE_API_KEY?.substring(0, 10),
+    testResult 
+  });
+});
+
 module.exports = router;

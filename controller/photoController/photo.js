@@ -26,7 +26,8 @@ const normalizeTags = (tags) => {
 exports.uploadPhoto = async (req, res) => {
   try {
     console.log('=== UPLOAD START ===');
-    console.log('Files received:', req.files?.length);
+    console.log('HUGGINGFACE_API_KEY exists?', !!process.env.HUGGINGFACE_API_KEY);
+    console.log('Files:', req.files?.length);
     
     if (!req.files || !req.files.length) {
       return res.status(400).json({ success: false, message: "No files uploaded" });
