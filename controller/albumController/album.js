@@ -222,3 +222,39 @@ exports.deleteAlbum = async (req, res) => {
         });
     }
 }
+
+// Toggle favorite album
+exports.toggleFavoriteAlbum = async (req, res) => {
+    try {
+        const album = await albumModel.findOne({
+            _id: req.params.id,
+            user: req.user.id
+        });
+
+        if (!album) {
+            return res.status(404).json({
+                success: false,
+                message: "Album not found"
+            });
+        }
+
+        // Toggle the favorite status
+        album.isFavorite = !album.isFavorite;
+        await album.save();
+
+        // Populate and return
+        const populatedAlbum = await albumModel.findById(album._id).populate('photos');
+
+        res.json({
+            success: true,
+            message: album.isFavorite ? "Album added to favorites" : "Album removed from favorites",
+            data: populatedAlbum
+        });
+    } catch (error) {
+        console.error("Toggle favorite error:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};

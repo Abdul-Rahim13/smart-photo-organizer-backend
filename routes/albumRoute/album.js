@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../../middleware/AuthMiddleware');
-const { createAlbum, getUserAlbums, getSingleAlbum, addPhotosToAlbum, removePhotosFromAlbum,updateAlbum,deleteAlbum } = require('../../controller/albumController/album');
+const { createAlbum, getUserAlbums, getSingleAlbum, addPhotosToAlbum, removePhotosFromAlbum,updateAlbum,deleteAlbum,  toggleFavoriteAlbum } = require('../../controller/albumController/album');
 
 
 
@@ -18,5 +18,7 @@ router.put('/:id/remove-photos', authMiddleware, removePhotosFromAlbum);
 router.put('/:id', authMiddleware, updateAlbum);
 
 router.delete('/:id', authMiddleware, deleteAlbum);
+
+router.put('/:id/favorite', authMiddleware, toggleFavoriteAlbum);
 
 module.exports = router;
